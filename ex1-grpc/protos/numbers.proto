@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package numbers;
+
+service ArrayOperator {
+	rpc Pow2(Number) returns (Number) {}
+
+	rpc ArrayPow2(stream Number) returns (stream Number) {}
+}
+
+message Number {
+	double value = 1;
+}
