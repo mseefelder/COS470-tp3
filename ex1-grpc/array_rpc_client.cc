@@ -15,6 +15,7 @@ using grpc::ClientContext;
 using grpc::Status;
 using grpc::ClientReaderWriter;
 using numbers::Number;
+using numbers::NumberParameter;
 using numbers::ArrayOperator;
 
 class ArrayOperatorClient {
@@ -75,6 +76,63 @@ class ArrayOperatorClient {
     }
   }
 
+  void arrayInc(double* vector, size_t vecSize) {
+   ClientContext context;
+
+    std::shared_ptr<ClientReaderWriter<Number, Number> > stream(
+        stub_->ArrayInc(&context));
+
+    std::thread writer([vector, vecSize, stream]() {
+      Number in;
+      for (size_t i = 0; i < vecSize; i++) {
+        in.set_value(vector[i]);
+        stream->Write(in);
+      }
+      stream->WritesDone();
+    });
+
+    Number server_number;
+    size_t counter = 0;
+    while (stream->Read(&server_number)) {
+      vector[counter] = server_number.value();
+      counter++;
+    }
+    writer.join();
+    Status status = stream->Finish();
+    if (!status.ok()) {
+      std::cout << "RouteChat rpc failed." << std::endl;
+    }
+  }
+
+  void arrayMultiplyBy(double* vector, size_t vecSize, double parameter) {
+   ClientContext context;
+
+    std::shared_ptr<ClientReaderWriter<NumberParameter, Number> > stream(
+        stub_->ArrayMultiplyBy(&context));
+
+    std::thread writer([vector, vecSize, stream, parameter]() {
+      NumberParameter in;
+      for (size_t i = 0; i < vecSize; i++) {
+        in.set_number(vector[i]);
+        in.set_parameter(parameter);
+        stream->Write(in);
+      }
+      stream->WritesDone();
+    });
+
+    Number server_number;
+    size_t counter = 0;
+    while (stream->Read(&server_number)) {
+      vector[counter] = server_number.value();
+      counter++;
+    }
+    writer.join();
+    Status status = stream->Finish();
+    if (!status.ok()) {
+      std::cout << "RouteChat rpc failed." << std::endl;
+    }
+  }
+
  private:
   std::unique_ptr<ArrayOperator::Stub> stub_;
 };
@@ -107,23 +165,45 @@ void randomAllocatedVector (double* element, long n, int numThreads) {
 
 int main(int argc, char** argv) {
   /**/
-  if (argc < 3)
-    {
-      std::cout<<"Usage is:\n"<<argv[0]<<
-        " <amount of numbers to generate>"<<
-        "<amount of threads>" <<
-        std::endl;
-      return 0;
-    }
+  if (argc < 4)
+  {
+    std::cout<<"Usage is:\n"<<argv[0]<<
+      " <amount of numbers to generate>"<<
+      " <amount of threads>" <<
+      " <opcode = 0,1,2>" << 
+      " <optional: parameter>\n" <<
+      " OP CODES:\n" <<
+      "    0 - Increment by 1;\n" <<
+      "    1 - Apply power of 2;\n" <<
+      "    2 - Multiply by parameter;\n" <<
+      "parameter default = 4.0" <<
+      std::endl;
+    return 0;
+  }
 
-  if (!isdigit(argv[1][0]))
-    {
-      std::cerr<<"Amount of numbers to generate should be a number!"<<std::endl;
-      return 0;
+  if (!isdigit(argv[1][0]) || !isdigit(argv[2][0]) || !isdigit(argv[3][0]))
+  {
+    std::cerr<<"Arguments should be numbers!"<<std::endl;
+    return 0;
   }
 
   long n = atol(argv[1]);
   int NUM_THREADS = atoi(argv[2]);
+  int opcode = atoi(argv[3]);
+  if (opcode < 0 || opcode > 2) {
+    std::cerr<<"IMPOSSIBLE OPCODE!"<<std::endl;
+    return 0;
+  }
+
+  double parameter = 4.0;
+  if (argc > 4) {
+    if (isdigit(argv[4][0])){
+      parameter = atof(argv[4]);
+    }
+  }
+  #ifdef DEBUG
+    std::cout<<"Parameter is:"<<parameter<<std::endl;      
+  #endif
 
   size_t nPerThreads = n/NUM_THREADS;
 
@@ -132,22 +212,34 @@ int main(int argc, char** argv) {
   int vectorThreads = 8;
   randomAllocatedVector(vector, n, vectorThreads);
 
-  //verify elements on vector ---> just test
-  for (int i = 0; i < n; ++i)
-  {
-    std::cout << vector[i] << std::endl;
-  }
+  #ifdef DEBUG
+    for (int i = 0; i < n; ++i)
+    {
+      std::cout << vector[i] << std::endl;
+    }
+  #endif
 
   for (int i = 0; i < NUM_THREADS; ++i)
   {
-    clients[i] = std::thread([i, vector, nPerThreads](){
+    clients[i] = std::thread([i, vector, nPerThreads, opcode, parameter](){
       ArrayOperatorClient greeter(grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials()));
-      //double input = (double) i;
-      //input = greeter.Pow2(input);
-      //std::cout << "Received: " << input << std::endl;
+      
       double *localVector = vector + nPerThreads*i;
-      greeter.arrayPow2(localVector, nPerThreads);
+      switch (opcode) {
+        case 0:
+          greeter.arrayInc(localVector, nPerThreads);
+          break;
+        case 1:
+          greeter.arrayPow2(localVector, nPerThreads);
+          break;
+        case 2:
+          greeter.arrayMultiplyBy(localVector, nPerThreads, parameter);
+          break;
+        default:
+          break;
+      }
+      
     });
   }
 
@@ -157,10 +249,12 @@ int main(int argc, char** argv) {
   }
   std::cout<<"Threads over"<<std::endl;
 
-  for (int i = 0; i < n; ++i)
-  {
-    std::cout<<vector[i]<<"\n";
-  }
+  #ifdef DEBUG
+    for (int i = 0; i < n; ++i)
+    {
+      std::cout<<vector[i]<<"\n";
+    }
+  #endif
   std::cout<<std::endl;
 
   delete [] vector;

@@ -12,6 +12,7 @@ using grpc::ServerContext;
 using grpc::Status;
 using grpc::ServerReaderWriter;
 using numbers::Number;
+using numbers::NumberParameter;
 using numbers::ArrayOperator;
 
 // Logic and data behind the server's behavior.
@@ -32,6 +33,29 @@ class ArrayOperatorServiceImpl final : public ArrayOperator::Service {
 
     return Status::OK;
   }
+
+  Status ArrayInc(ServerContext* context,
+                   ServerReaderWriter<Number, Number>* stream) override {
+    Number number;
+    while (stream->Read(&number)) {
+      number.set_value(number.value()+1.0);
+      stream->Write(number);
+    }
+
+    return Status::OK;
+  }
+
+  Status ArrayMultiplyBy(ServerContext* context,
+                   ServerReaderWriter<Number, NumberParameter>* stream) override {
+    NumberParameter in;
+    Number out;
+    while (stream->Read(&in)) {
+      out.set_value(in.number()*in.parameter());
+      stream->Write(out);
+    }
+
+    return Status::OK;
+  }  
 };
 
 void RunServer() {

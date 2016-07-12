@@ -11,7 +11,6 @@ PROTOS_PATH = protos
 vpath %.proto $(PROTOS_PATH)
 
 all: system-check array_rpc_client array_rpc_server
-
 array_rpc_client: numbers.pb.o numbers.grpc.pb.o array_rpc_client.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 

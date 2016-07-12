@@ -6,8 +6,18 @@ service ArrayOperator {
 	rpc Pow2(Number) returns (Number) {}
 
 	rpc ArrayPow2(stream Number) returns (stream Number) {}
+
+	rpc ArrayMultiplyBy(stream NumberParameter) returns (stream Number) {}
+
+	rpc ArrayInc(stream Number) returns (stream Number) {}
 }
 
 message Number {
 	double value = 1;
 }
+
+message NumberParameter {
+	double number = 1;
+	double parameter = 2;
+}
+
