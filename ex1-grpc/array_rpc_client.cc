@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 #include <cstring>
+#include <random>
+#include <unistd.h>
 
 #include <grpc++/grpc++.h>
 
@@ -70,47 +72,97 @@ class ArrayOperatorClient {
     Status status = stream->Finish();
     if (!status.ok()) {
       std::cout << "RouteChat rpc failed." << std::endl;
-    }     
+    }
   }
 
  private:
   std::unique_ptr<ArrayOperator::Stub> stub_;
 };
 
-int main(int argc, char** argv) {  
-  /**/
-  int num_clients = 128;
-  std::thread* clients = new std::thread[num_clients];
-  double* vector = new double[num_clients*2];
+void fillArrayCorrect(int tid, long n, double* element, int numThreads) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dis(-100,100);
+  int nPerThread = n/numThreads;
+  int index = tid * nPerThread;
+  for ( int i = index; i < index + nPerThread; i ++) {
+    element[i] = dis(gen);
+  }
+}
 
-  for (int i = 0; i < num_clients*2; ++i)
-  {
-    vector[i] = (double) i;
+void randomAllocatedVector (double* element, long n, int numThreads) {
+  std::thread *th = new std::thread[numThreads];
+
+  for( int i = 0; i < numThreads ; i++) {
+    th[i] = std::thread(fillArrayCorrect,i,n,element, numThreads);
   }
 
-  for (int i = 0; i < num_clients; ++i)
+  for(int i = 0; i < numThreads; i++) {
+    th[i].join();
+  }
+  delete [] th;
+}
+
+
+
+int main(int argc, char** argv) {
+  /**/
+  if (argc < 3)
+    {
+      std::cout<<"Usage is:\n"<<argv[0]<<
+        " <amount of numbers to generate>"<<
+        "<amount of threads>" <<
+        std::endl;
+      return 0;
+    }
+
+  if (!isdigit(argv[1][0]))
+    {
+      std::cerr<<"Amount of numbers to generate should be a number!"<<std::endl;
+      return 0;
+  }
+
+  long n = atol(argv[1]);
+  int NUM_THREADS = atoi(argv[2]);
+
+  size_t nPerThreads = n/NUM_THREADS;
+
+  std::thread* clients = new std::thread[NUM_THREADS];
+  double* vector = new double[n];
+  int vectorThreads = 8;
+  randomAllocatedVector(vector, n, vectorThreads);
+
+  //verify elements on vector ---> just test
+  for (int i = 0; i < n; ++i)
   {
-    clients[i] = std::thread([i, vector](){
+    std::cout << vector[i] << std::endl;
+  }
+
+  for (int i = 0; i < NUM_THREADS; ++i)
+  {
+    clients[i] = std::thread([i, vector, nPerThreads](){
       ArrayOperatorClient greeter(grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials()));
       //double input = (double) i;
       //input = greeter.Pow2(input);
       //std::cout << "Received: " << input << std::endl;
-      double *localVector = vector+2*i;
-      greeter.arrayPow2(localVector, 2);
+      double *localVector = vector + nPerThreads*i;
+      greeter.arrayPow2(localVector, nPerThreads);
     });
   }
 
-  for (int i = 0; i < num_clients; ++i)
+  for (int i = 0; i < NUM_THREADS; ++i)
   {
     clients[i].join();
   }
   std::cout<<"Threads over"<<std::endl;
-  for (int i = 0; i < num_clients*2; ++i)
+
+  for (int i = 0; i < n; ++i)
   {
     std::cout<<vector[i]<<"\n";
   }
   std::cout<<std::endl;
+
   delete [] vector;
   /**/
   return 0;
