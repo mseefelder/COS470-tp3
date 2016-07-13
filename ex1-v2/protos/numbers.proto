@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package numbers;
+
+service ArrayOperator {
+	rpc ArrayPow2(NumberArray) returns (NumberArray) {}
+
+	rpc ArrayMultiplyBy(NumberArrayParameter) returns (NumberArray) {}
+
+	rpc ArrayInc(NumberArray) returns (NumberArray) {}
+}
+
+message NumberArray {
+	repeated double value = 1;
+}
+
+message NumberArrayParameter {
+	repeated double value = 1;
+	double parameter = 2;
+}
+

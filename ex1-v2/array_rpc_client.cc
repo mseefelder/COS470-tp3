@@ -16,8 +16,8 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 using grpc::ClientReaderWriter;
-using numbers::Number;
-using numbers::NumberParameter;
+using numbers::NumberArray;
+using numbers::NumberArrayParameter;
 using numbers::ArrayOperator;
 
 class ArrayOperatorClient {
@@ -27,115 +27,167 @@ class ArrayOperatorClient {
 
   // Assambles the client's payload, sends it and presents the response back
   // from the server.
-  double Pow2(const double value) {
+  //double Pow2(const double value) {
+  //  // Data we are sending to the server.
+  //  Number in;
+  //  in.set_value(value);
+  //  // Container for the data we expect from the server.
+  //  Number out;
+  //  // Context for the client. It could be used to convey extra information to
+  //  // the server and/or tweak certain RPC behaviors.
+  //  ClientContext context;
+  //  // The actual RPC.
+  //  Status status = stub_->Pow2(&context, in, &out);
+  //  // Act upon its status.
+  //  if (status.ok()) {
+  //    return out.value();
+  //  } else {
+  //    return 0.0;
+  //  }
+  //}
+
+  void arrayPow2(double* vector, size_t vecSize) {
+    //break rpc call into chunks
+    this->chunkify(&ArrayOperatorClient::_arrayPow2, vector, vecSize, 0.0);
+  }
+
+  void arrayInc(double* vector, size_t vecSize) {
+    //break rpc call into chunks
+    this->chunkify(&ArrayOperatorClient::_arrayInc, vector, vecSize, 0.0);
+  }
+
+  void arrayMultiplyBy(double* vector, size_t vecSize, double parameter) {
+    //break rpc call into chunks
+    this->chunkify(&ArrayOperatorClient::_arrayMultiplyBy, vector, vecSize, parameter);
+  }
+
+
+ private:
+  /**/
+  void chunkify ( void (ArrayOperatorClient::*function)(double*, size_t, double), double* vector, size_t vecSize, double parameter){
+    const size_t limit = 524288;
+    size_t chunkSent = 0;
+    size_t emptySpace = 0;
+
+    if (vecSize <= limit) {
+      //vecSize <= limit: OK TO SEND
+      (this->*function)(vector, vecSize, parameter);
+    } else {
+      size_t iterations = (vecSize/limit);
+      // vecSize > limit: BREAK IN iterations+1 chunks
+      //full chunks
+      for (int i = 0; i < iterations; ++i)
+      {
+        chunkSent = i*limit;
+        (this->*function)(vector+chunkSent, limit, parameter);
+      }
+      //last chunk
+      (this->*function)(vector+((iterations)*limit), vecSize-(iterations*limit), parameter);
+    }
+  }
+  /**/
+  // Assambles the client's payload, sends it and presents the response back
+  // from the server.
+  void _arrayPow2(double* vector, size_t vecSize, double garbage) {
+
     // Data we are sending to the server.
-    Number in;
-    in.set_value(value);
+    NumberArray in;
+
+    for (int i = 0; i < vecSize; ++i)
+    {
+      in.add_value(vector[i]);
+    }
 
     // Container for the data we expect from the server.
-    Number out;
+    NumberArray out;
 
     // Context for the client. It could be used to convey extra information to
     // the server and/or tweak certain RPC behaviors.
     ClientContext context;
 
     // The actual RPC.
-    Status status = stub_->Pow2(&context, in, &out);
+    Status status = stub_->ArrayPow2(&context, in, &out);
+
+    for (int i = 0; i < vecSize; ++i)
+    {
+      vector[i] = out.value(i);
+    }
 
     // Act upon its status.
     if (status.ok()) {
-      return out.value();
+      return;
     } else {
-      return 0.0;
+      return;
     }
   }
 
-  void arrayPow2(double* vector, size_t vecSize) {
-   ClientContext context;
+  void _arrayInc(double* vector, size_t vecSize, double garbage) {
 
-    std::shared_ptr<ClientReaderWriter<Number, Number> > stream(
-        stub_->ArrayPow2(&context));
+    // Data we are sending to the server.
+    NumberArray in;
 
-    std::thread writer([vector, vecSize, stream]() {
-      Number in;
-      for (size_t i = 0; i < vecSize; i++) {
-        in.set_value(vector[i]);
-        stream->Write(in);
-      }
-      stream->WritesDone();
-    });
-
-    Number server_number;
-    size_t counter = 0;
-    while (stream->Read(&server_number)) {
-      vector[counter] = server_number.value();
-      counter++;
+    for (int i = 0; i < vecSize; ++i)
+    {
+      in.add_value(vector[i]);
     }
-    writer.join();
-    Status status = stream->Finish();
-    if (!status.ok()) {
-      std::cout << "RouteChat rpc failed." << std::endl;
+
+    // Container for the data we expect from the server.
+    NumberArray out;
+
+    // Context for the client. It could be used to convey extra information to
+    // the server and/or tweak certain RPC behaviors.
+    ClientContext context;
+
+    // The actual RPC.
+    Status status = stub_->ArrayInc(&context, in, &out);
+
+    for (int i = 0; i < vecSize; ++i)
+    {
+      vector[i] = out.value(i);
     }
-  }
 
-  void arrayInc(double* vector, size_t vecSize) {
-   ClientContext context;
-
-    std::shared_ptr<ClientReaderWriter<Number, Number> > stream(
-        stub_->ArrayInc(&context));
-
-    std::thread writer([vector, vecSize, stream]() {
-      Number in;
-      for (size_t i = 0; i < vecSize; i++) {
-        in.set_value(vector[i]);
-        stream->Write(in);
-      }
-      stream->WritesDone();
-    });
-
-    Number server_number;
-    size_t counter = 0;
-    while (stream->Read(&server_number)) {
-      vector[counter] = server_number.value();
-      counter++;
-    }
-    writer.join();
-    Status status = stream->Finish();
-    if (!status.ok()) {
-      std::cout << "RouteChat rpc failed." << std::endl;
+    // Act upon its status.
+    if (status.ok()) {
+      return;
+    } else {
+      return;
     }
   }
 
-  void arrayMultiplyBy(double* vector, size_t vecSize, double parameter) {
-   ClientContext context;
+  void _arrayMultiplyBy(double* vector, size_t vecSize, double parameter) {
 
-    std::shared_ptr<ClientReaderWriter<NumberParameter, Number> > stream(
-        stub_->ArrayMultiplyBy(&context));
+    // Data we are sending to the server.
+    NumberArrayParameter in;
 
-    std::thread writer([vector, vecSize, stream, parameter]() {
-      NumberParameter in;
-      for (size_t i = 0; i < vecSize; i++) {
-        in.set_number(vector[i]);
-        in.set_parameter(parameter);
-        stream->Write(in);
-      }
-      stream->WritesDone();
-    });
-
-    Number server_number;
-    size_t counter = 0;
-    while (stream->Read(&server_number)) {
-      vector[counter] = server_number.value();
-      counter++;
+    in.set_parameter(parameter);
+    for (int i = 0; i < vecSize; ++i)
+    {
+      in.add_value(vector[i]);
     }
-    writer.join();
-    Status status = stream->Finish();
-    if (!status.ok()) {
-      std::cout << "RouteChat rpc failed." << std::endl;
+
+    // Container for the data we expect from the server.
+    NumberArray out;
+
+    // Context for the client. It could be used to convey extra information to
+    // the server and/or tweak certain RPC behaviors.
+    ClientContext context;
+
+    // The actual RPC.
+    Status status = stub_->ArrayMultiplyBy(&context, in, &out);
+
+    for (int i = 0; i < vecSize; ++i)
+    {
+      vector[i] = out.value(i);
+    }
+
+    // Act upon its status.
+    if (status.ok()) {
+      return;
+    } else {
+      return;
     }
   }
 
- private:
   std::unique_ptr<ArrayOperator::Stub> stub_;
 };
 
@@ -163,12 +215,19 @@ void randomAllocatedVector (double* element, long n, int numThreads) {
   delete [] th;
 }
 
-float runApplication (int& NUM_THREADS, double* vector, 
+double runApplication (int& NUM_THREADS, double* vector, 
                      long& n, size_t& nPerThreads, 
                      int& opcode, double& parameter) {
   std::thread* clients = new std::thread[NUM_THREADS];
   int vectorThreads = 8;
   randomAllocatedVector(vector, n, vectorThreads);
+
+  #ifdef DEBUG
+    for (int i = 0; i < n; ++i)
+    {
+      std::cout << vector[i] << std::endl;
+    }
+  #endif
 
   struct timeval start, end;
   gettimeofday(&start, NULL);
@@ -203,8 +262,15 @@ float runApplication (int& NUM_THREADS, double* vector,
   }
 
   gettimeofday(&end, NULL);
-  float seconds = ((end.tv_sec  - start.tv_sec) * 1000000u + 
+  double seconds = ((end.tv_sec  - start.tv_sec) * 1000000u + 
     end.tv_usec - start.tv_usec) / 1.e6;
+
+  #ifdef DEBUG
+    for (int i = 0; i < n; ++i)
+    {
+      std::cout << vector[i] << std::endl;
+    }
+  #endif
 
   delete [] clients;
   std::cout<<"."<<std::flush;
@@ -265,37 +331,23 @@ int main(int argc, char** argv) {
 
   double* vector = new double[n];
 
-  #ifdef DEBUG
-    for (int i = 0; i < n; ++i)
-    {
-      std::cout << vector[i] << std::endl;
-    }
-  #endif
-
   std::cout<<"n = "<<n<<" and "<<NUM_THREADS<<" threads"<<std::endl;
 
-  float* times = new float[repeat];
+  double* times = new double[repeat];
 
-  float meanTime = 0.0;
+  double meanTime = 0.0;
   for (int i = 0; i < repeat; ++i)
   {
     times[i] = runApplication(NUM_THREADS, vector, n, 
                               nPerThreads, opcode, parameter);
-    meanTime += times[i]/(float)repeat;
+    meanTime += times[i]/(double)repeat;
   }
 
-  #ifdef DEBUG
-    for (int i = 0; i < n; ++i)
-    {
-      std::cout<<vector[i]<<"\n";
-    }
-  #endif
-
-  float stdDev = 0.0;
+  double stdDev = 0.0;
 
   for (int i = 0; i < repeat; ++i)
   {
-    stdDev = ((meanTime-times[i])*(meanTime-times[i]))/(float)repeat;
+    stdDev = ((meanTime-times[i])*(meanTime-times[i]))/(double)repeat;
   }
   stdDev = std::sqrt(stdDev);
 
