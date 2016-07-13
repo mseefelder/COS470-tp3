@@ -25,3 +25,7 @@ end
 function Queue.head (queue)
 	return queue[queue.first]
 end
+
+function Queue.size (queue)
+  return queue.last - queue.first + 1
+end

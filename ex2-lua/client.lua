@@ -29,6 +29,7 @@ function writer()
 
 	-- first sleep
 	sleep(math.random())
+	assert(udp:sendto(0x3, ip, port)) --CONNECT
 
 	-- write 100 lines
 	for i=1,100 do
@@ -40,7 +41,7 @@ function writer()
 			print("Received error: ", err)
 	    elseif response == tostring(0x2) then
 	    	-- 0x2 == GRANT
-	    	print("Aw yis")
+	    	--print("Aw yis")
 			-- critical session start
 				local file = io.open("critical.txt", "a")
 				file:write(name .. " is writing " .. i .. "\n")
@@ -54,6 +55,8 @@ function writer()
 	    	print("Received: ", response)
 		end
 	end
+
+	assert(udp:sendto(0x4, ip, port)) --DISCONNECT
 end
 
 -- run script
