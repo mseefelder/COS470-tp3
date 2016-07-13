@@ -11,22 +11,17 @@ local server = socket.udp()
 server:setsockname("*",port)
 
 function handler(skt)
-	--use luasocket calls directly on skt
-	--skt = copas.wrap(skt)
-
 	-- Coordinator's log
 	local file = io.open("log.txt", "w")
 	file:write("COORDINATOR LOG\n")
 	file:close()
 
 	print("UDP mutex coordinator")
+	print("receiving...")
 	while true do
-		-- auxiliar variables
-		--s, err, sktport, sktip, message
 
 		-- receive message on socket
 		-- store sender infos on variables
-		print("receiving...")
 		s, err, sktport, sktip = skt:receivefrom(1)
 
 		if not s then
@@ -133,6 +128,8 @@ function handler(skt)
 
 	end
 
+	print("no more clients...")
+
 end
 
 -- Queue for waiting writers
@@ -145,6 +142,4 @@ start_time = 0
 end_time = 0
 
 -- Create server and start serving
---copas.addserver(server, handler, 1)
---copas.loop()
 handler(server)
