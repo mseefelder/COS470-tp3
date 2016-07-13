@@ -3,8 +3,10 @@
 #include <memory>
 #include <string>
 #include <cstring>
+#include <cstdio>
 #include <random>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include <grpc++/grpc++.h>
 
@@ -161,7 +163,54 @@ void randomAllocatedVector (double* element, long n, int numThreads) {
   delete [] th;
 }
 
+float runApplication (int& NUM_THREADS, double* vector, 
+                     long& n, size_t& nPerThreads, 
+                     int& opcode, double& parameter) {
+  std::thread* clients = new std::thread[NUM_THREADS];
+  int vectorThreads = 8;
+  randomAllocatedVector(vector, n, vectorThreads);
 
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+
+  for (int i = 0; i < NUM_THREADS; ++i)
+  {
+    clients[i] = std::thread([i, vector, nPerThreads, opcode, parameter](){
+      ArrayOperatorClient greeter(grpc::CreateChannel(
+      "localhost:50051", grpc::InsecureChannelCredentials()));
+      
+      double *localVector = vector + nPerThreads*i;
+      switch (opcode) {
+        case 0:
+          greeter.arrayInc(localVector, nPerThreads);
+          break;
+        case 1:
+          greeter.arrayPow2(localVector, nPerThreads);
+          break;
+        case 2:
+          greeter.arrayMultiplyBy(localVector, nPerThreads, parameter);
+          break;
+        default:
+          break;
+      }
+      
+    });
+  }
+
+  for (int i = 0; i < NUM_THREADS; ++i)
+  {
+    clients[i].join();
+  }
+
+  gettimeofday(&end, NULL);
+  float seconds = ((end.tv_sec  - start.tv_sec) * 1000000u + 
+    end.tv_usec - start.tv_usec) / 1.e6;
+
+  delete [] clients;
+  std::cout<<".";
+
+  return seconds;
+}
 
 int main(int argc, char** argv) {
   /**/
@@ -207,10 +256,7 @@ int main(int argc, char** argv) {
 
   size_t nPerThreads = n/NUM_THREADS;
 
-  std::thread* clients = new std::thread[NUM_THREADS];
   double* vector = new double[n];
-  int vectorThreads = 8;
-  randomAllocatedVector(vector, n, vectorThreads);
 
   #ifdef DEBUG
     for (int i = 0; i < n; ++i)
@@ -219,35 +265,14 @@ int main(int argc, char** argv) {
     }
   #endif
 
-  for (int i = 0; i < NUM_THREADS; ++i)
-  {
-    clients[i] = std::thread([i, vector, nPerThreads, opcode, parameter](){
-      ArrayOperatorClient greeter(grpc::CreateChannel(
-      "localhost:50051", grpc::InsecureChannelCredentials()));
-      
-      double *localVector = vector + nPerThreads*i;
-      switch (opcode) {
-        case 0:
-          greeter.arrayInc(localVector, nPerThreads);
-          break;
-        case 1:
-          greeter.arrayPow2(localVector, nPerThreads);
-          break;
-        case 2:
-          greeter.arrayMultiplyBy(localVector, nPerThreads, parameter);
-          break;
-        default:
-          break;
-      }
-      
-    });
-  }
+  std::cout<<"n = "<<n<<" and "<<NUM_THREADS<<" threads"<<std::endl;
 
-  for (int i = 0; i < NUM_THREADS; ++i)
+  float meanTime = 0.0;
+  for (int i = 0; i < 10; ++i)
   {
-    clients[i].join();
+    meanTime += runApplication(NUM_THREADS, vector, n, 
+                              nPerThreads, opcode, parameter)/10.0;
   }
-  std::cout<<"Threads over"<<std::endl;
 
   #ifdef DEBUG
     for (int i = 0; i < n; ++i)
@@ -255,7 +280,16 @@ int main(int argc, char** argv) {
       std::cout<<vector[i]<<"\n";
     }
   #endif
-  std::cout<<std::endl;
+  std::cout<<"\nMean time: "<<meanTime<<" seconds"<<std::endl;
+
+  char fname[80];
+  FILE* fout;
+  sprintf(fname,"times.log");
+  fout = fopen(fname,"a");
+  fprintf(fout, "vector size: %ld", n);
+  fprintf(fout, " nThreads: %d opcode: %d", NUM_THREADS, opcode);
+  fprintf(fout, " mean time: %f s \n", meanTime);
+  fclose(fout);
 
   delete [] vector;
   /**/
