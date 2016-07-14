@@ -25,26 +25,6 @@ class ArrayOperatorClient {
   ArrayOperatorClient(std::shared_ptr<Channel> channel)
       : stub_(ArrayOperator::NewStub(channel)) {}
 
-  // Assambles the client's payload, sends it and presents the response back
-  // from the server.
-  //double Pow2(const double value) {
-  //  // Data we are sending to the server.
-  //  Number in;
-  //  in.set_value(value);
-  //  // Container for the data we expect from the server.
-  //  Number out;
-  //  // Context for the client. It could be used to convey extra information to
-  //  // the server and/or tweak certain RPC behaviors.
-  //  ClientContext context;
-  //  // The actual RPC.
-  //  Status status = stub_->Pow2(&context, in, &out);
-  //  // Act upon its status.
-  //  if (status.ok()) {
-  //    return out.value();
-  //  } else {
-  //    return 0.0;
-  //  }
-  //}
 
   void arrayPow2(double* vector, size_t vecSize) {
     //break rpc call into chunks
@@ -63,11 +43,17 @@ class ArrayOperatorClient {
 
 
  private:
-  /**/
-  void chunkify ( void (ArrayOperatorClient::*function)(double*, size_t, double), double* vector, size_t vecSize, double parameter){
+
+  //Break thread vector into smaller chunks to avoid grpc warnings or errors regarding big messages
+  void chunkify ( void (ArrayOperatorClient::*function)(double*, size_t, double), 
+                  double* vector, 
+                  size_t vecSize, 
+                  double parameter)
+  {
+    //adequate limit for double quantity
     const size_t limit = 524288;
+    //amount of doubles already sent
     size_t chunkSent = 0;
-    size_t emptySpace = 0;
 
     if (vecSize <= limit) {
       //vecSize <= limit: OK TO SEND
@@ -75,26 +61,21 @@ class ArrayOperatorClient {
     } else {
       size_t iterations = (vecSize/limit);
       // vecSize > limit: BREAK IN iterations+1 chunks
-      //full chunks
+      //full chunks are those which have 'limit' doubles
       for (int i = 0; i < iterations; ++i)
       {
         chunkSent = i*limit;
         (this->*function)(vector+chunkSent, limit, parameter);
       }
-      //last chunk
+      //last chunk, may have 0 to 'limit' doubles
       (this->*function)(vector+((iterations)*limit), vecSize-(iterations*limit), parameter);
     }
   }
-  /**/
-  // Assambles the client's payload, sends it and presents the response back
-  // from the server.
+
   void _arrayPow2(double* vector, size_t vecSize, double garbage) {
-
-    // Data we are sending to the server.
+    // Data we are sending to the server. Copy values
     NumberArray in;
-
-    for (int i = 0; i < vecSize; ++i)
-    {
+    for (int i = 0; i < vecSize; ++i) {
       in.add_value(vector[i]);
     }
 
@@ -108,12 +89,12 @@ class ArrayOperatorClient {
     // The actual RPC.
     Status status = stub_->ArrayPow2(&context, in, &out);
 
-    for (int i = 0; i < vecSize; ++i)
-    {
+    // Restore values
+    for (int i = 0; i < vecSize; ++i) {
       vector[i] = out.value(i);
     }
 
-    // Act upon its status.
+    // Act upon its status. No treatment implemented
     if (status.ok()) {
       return;
     } else {
@@ -122,12 +103,9 @@ class ArrayOperatorClient {
   }
 
   void _arrayInc(double* vector, size_t vecSize, double garbage) {
-
-    // Data we are sending to the server.
+    // Data we are sending to the server. Copy values
     NumberArray in;
-
-    for (int i = 0; i < vecSize; ++i)
-    {
+    for (int i = 0; i < vecSize; ++i) {
       in.add_value(vector[i]);
     }
 
@@ -141,12 +119,12 @@ class ArrayOperatorClient {
     // The actual RPC.
     Status status = stub_->ArrayInc(&context, in, &out);
 
-    for (int i = 0; i < vecSize; ++i)
-    {
+    // Restore values
+    for (int i = 0; i < vecSize; ++i) {
       vector[i] = out.value(i);
     }
 
-    // Act upon its status.
+    // Act upon its status. No treatment implemented
     if (status.ok()) {
       return;
     } else {
@@ -155,13 +133,10 @@ class ArrayOperatorClient {
   }
 
   void _arrayMultiplyBy(double* vector, size_t vecSize, double parameter) {
-
-    // Data we are sending to the server.
+    // Data we are sending to the server. Copy values
     NumberArrayParameter in;
-
     in.set_parameter(parameter);
-    for (int i = 0; i < vecSize; ++i)
-    {
+    for (int i = 0; i < vecSize; ++i) {
       in.add_value(vector[i]);
     }
 
@@ -175,12 +150,12 @@ class ArrayOperatorClient {
     // The actual RPC.
     Status status = stub_->ArrayMultiplyBy(&context, in, &out);
 
-    for (int i = 0; i < vecSize; ++i)
-    {
+    //Restore values
+    for (int i = 0; i < vecSize; ++i) {
       vector[i] = out.value(i);
     }
 
-    // Act upon its status.
+    // Act upon its status. No treatment implemented
     if (status.ok()) {
       return;
     } else {
@@ -191,54 +166,64 @@ class ArrayOperatorClient {
   std::unique_ptr<ArrayOperator::Stub> stub_;
 };
 
+// Thread function for thread 'tid' to fill 'n' values on array 'element'
 void fillArrayCorrect(int tid, long n, double* element, int numThreads) {
+  // Use C++11 Mersenne Twister's random number generator
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis(-100,100);
+  // Number of elements generated per thread
   int nPerThread = n/numThreads;
+  // Starting index for this thread
   int index = tid * nPerThread;
   for ( int i = index; i < index + nPerThread; i ++) {
     element[i] = dis(gen);
   }
 }
 
+// Fill vector 'element' with size 'n' using 'numThreads' threads
 void randomAllocatedVector (double* element, long n, int numThreads) {
   std::thread *th = new std::thread[numThreads];
-
+  //spawn worker threads and join after the work is done
   for( int i = 0; i < numThreads ; i++) {
     th[i] = std::thread(fillArrayCorrect,i,n,element, numThreads);
   }
-
   for(int i = 0; i < numThreads; i++) {
     th[i].join();
   }
   delete [] th;
 }
 
-double runApplication (int& NUM_THREADS, double* vector, 
-                     long& n, size_t& nPerThreads, 
-                     int& opcode, double& parameter) {
+// Run one execution of application
+// This function was created to make it easier to run 10 tests
+//and take timing average and standard deviation
+double runApplication (int& NUM_THREADS, 
+                      double* vector, 
+                      long& n, 
+                      size_t& nPerThreads, 
+                      int& opcode, 
+                      double& parameter) 
+{
+
   std::thread* clients = new std::thread[NUM_THREADS];
-  int vectorThreads = 8;
-  randomAllocatedVector(vector, n, vectorThreads);
+  
+  //create random vectors
+  randomAllocatedVector(vector, n, NUM_THREADS);
 
-  #ifdef DEBUG
-    for (int i = 0; i < n; ++i)
-    {
-      std::cout << vector[i] << std::endl;
-    }
-  #endif
-
+  //start timing
   struct timeval start, end;
   gettimeofday(&start, NULL);
 
-  for (int i = 0; i < NUM_THREADS; ++i)
-  {
+  for (int i = 0; i < NUM_THREADS; ++i) {
+    // launch thread with c++11's lambda function
+    // lambda is defined as: [captured variables](parameters){function}
     clients[i] = std::thread([i, vector, nPerThreads, opcode, parameter](){
       ArrayOperatorClient greeter(grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials()));
-      
+      // find out where this thread's vector part begins with
+      //pointer arithmetic 
       double *localVector = vector + nPerThreads*i;
+      // Based on 'opcode' choose operation
       switch (opcode) {
         case 0:
           greeter.arrayInc(localVector, nPerThreads);
@@ -255,71 +240,69 @@ double runApplication (int& NUM_THREADS, double* vector,
       
     });
   }
-
-  for (int i = 0; i < NUM_THREADS; ++i)
-  {
+  // join clients after they're done
+  for (int i = 0; i < NUM_THREADS; ++i) {
     clients[i].join();
   }
 
+  //end timing
   gettimeofday(&end, NULL);
   double seconds = ((end.tv_sec  - start.tv_sec) * 1000000u + 
     end.tv_usec - start.tv_usec) / 1.e6;
 
-  #ifdef DEBUG
-    for (int i = 0; i < n; ++i)
-    {
-      std::cout << vector[i] << std::endl;
-    }
-  #endif
-
+  //avoid memory leaks
   delete [] clients;
+
+  // print to have a notion of progress
   std::cout<<"."<<std::flush;
 
   return seconds;
 }
 
 int main(int argc, char** argv) {
-  /**/
-  if (argc < 4)
+  // Usage explanation
+  if (argc < 5)
   {
     std::cout<<"Usage is:\n"<<argv[0]<<
       " <amount of numbers to generate>"<<
       " <amount of threads>" <<
       " <opcode = 0,1,2>" << 
-      " <optional: parameter>\n" <<
+      " <parameter>\n" <<
+      " <optional: number of executions. default = 1>"
       " OP CODES:\n" <<
       "    0 - Increment by 1;\n" <<
       "    1 - Apply power of 2;\n" <<
       "    2 - Multiply by parameter;\n" <<
-      "parameter default = 4.0" <<
+      "\nDISCLAIMER: Even though not every operation uses a parameter," <<
+      " you have to specify one when using the 'number of executions'"<<
+      " input.\n" <<
       std::endl;
     return 0;
   }
 
-  if (!isdigit(argv[1][0]) || !isdigit(argv[2][0]) || !isdigit(argv[3][0]) || !isdigit(argv[5][0]))
+  if (!isdigit(argv[1][0]) || !isdigit(argv[2][0]) || !isdigit(argv[3][0]))
   {
     std::cerr<<"Arguments should be numbers!"<<std::endl;
     return 0;
   }
-
+  // size of vector
   long n = atol(argv[1]);
+  // number of threads
   int NUM_THREADS = atoi(argv[2]);
+  // operation 
   int opcode = atoi(argv[3]);
   if (opcode < 0 || opcode > 2) {
     std::cerr<<"IMPOSSIBLE OPCODE!"<<std::endl;
     return 0;
   }
 
+  // Parameter for parameterized operations
   double parameter = 4.0;
-  if (argc > 4) {
-    if (isdigit(argv[4][0])){
-      parameter = atof(argv[4]);
-    }
+  if (isdigit(argv[4][0])){
+    parameter = atof(argv[4]);
   }
-  #ifdef DEBUG
-    std::cout<<"Parameter is:"<<parameter<<std::endl;      
-  #endif
 
+  // How many times is execution repeated
   int repeat = 1;
   if (argc > 5) {
     if (isdigit(argv[5][0])){
@@ -327,33 +310,30 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Number of elements processed by each thread
   size_t nPerThreads = n/NUM_THREADS;
-
+  // Vector to be operated
   double* vector = new double[n];
-
-  std::cout<<"n = "<<n<<" and "<<NUM_THREADS<<" threads"<<std::endl;
-
+  // Execution times, for standard deviation calculation
   double* times = new double[repeat];
-
+  // Mean time
   double meanTime = 0.0;
-  for (int i = 0; i < repeat; ++i)
-  {
+  // Run all executions
+  for (int i = 0; i < repeat; ++i) {
     times[i] = runApplication(NUM_THREADS, vector, n, 
                               nPerThreads, opcode, parameter);
     meanTime += times[i]/(double)repeat;
   }
-
+  // Calculate standard deviation
   double stdDev = 0.0;
-
-  for (int i = 0; i < repeat; ++i)
-  {
+  for (int i = 0; i < repeat; ++i) {
     stdDev = ((meanTime-times[i])*(meanTime-times[i]))/(double)repeat;
   }
   stdDev = std::sqrt(stdDev);
-
+  // Log results to console
   std::cout<<"\nMean time: "<<meanTime<<" seconds"<<std::endl;
   std::cout<<"\nStandard Deviation: "<<stdDev<<" seconds"<<std::endl;
-
+  // Write results to file
   char fname[80];
   FILE* fout;
   sprintf(fname,"times.log");
@@ -364,7 +344,7 @@ int main(int argc, char** argv) {
   fprintf(fout, " mean time: %f s \n", meanTime);
   fclose(fout);
 
+  //avoid memory leaks
   delete [] vector;
-  /**/
   return 0;
 }

@@ -1,6 +1,5 @@
 -- load dependencies
 local socket = require "socket"
-local copas = require "copas"
 local queue = require "queue"
 
 -- this coordinator's host and port
@@ -10,20 +9,21 @@ local server = socket.udp()
 -- make socket
 server:setsockname("*",port)
 
+-- Coordinator execution function
 function handler(skt)
 	-- Coordinator's log
 	local file = io.open("log.txt", "w")
 	file:write("COORDINATOR LOG\n")
 	file:close()
 
+	-- print to console
 	print("UDP mutex coordinator")
 	print("receiving...")
 	while true do
-
 		-- receive message on socket
 		-- store sender infos on variables
 		s, err, sktport, sktip = skt:receivefrom(1)
-
+		-- treat what was received
 		if not s then
 			print("Receive error: ", err)
 			break
@@ -72,7 +72,13 @@ function handler(skt)
 						print("Time elapsed: ", elapsed_time)
 						-- Write log
 						file = io.open("log.txt", "a")
-						file:write("ELAPSED (" .. os.date("%X") .. ") SECONDS (" .. elapsed_time .. ")\n")
+						file:write(
+							"ELAPSED (" .. 
+							os.date("%X") .. 
+							") SECONDS (" .. 
+							elapsed_time .. 
+							")\n"
+						)
 						file:close()
 						return
 					end

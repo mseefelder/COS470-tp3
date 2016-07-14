@@ -17,11 +17,13 @@ using numbers::ArrayOperator;
 
 // Logic and data behind the server's behavior.
 class ArrayOperatorServiceImpl final : public ArrayOperator::Service {
-
+  /*
+  All three functions just read each value in the 'in' parameter, 
+  operate it and write it back to out
+  */
   Status ArrayPow2(ServerContext* context, const NumberArray* in,
                   NumberArray* out) override {
-    for (int i = 0; i < in->value_size(); ++i)
-    {
+    for (int i = 0; i < in->value_size(); ++i) {
       out->add_value(in->value(i)*in->value(i));
     }
     return Status::OK;
@@ -29,8 +31,7 @@ class ArrayOperatorServiceImpl final : public ArrayOperator::Service {
 
   Status ArrayInc(ServerContext* context, const NumberArray* in,
                   NumberArray* out) override {
-    for (int i = 0; i < in->value_size(); ++i)
-    {
+    for (int i = 0; i < in->value_size(); ++i) {
       out->add_value(in->value(i)+1.0);
     }
     return Status::OK;
@@ -38,13 +39,11 @@ class ArrayOperatorServiceImpl final : public ArrayOperator::Service {
 
   Status ArrayMultiplyBy(ServerContext* context, const NumberArrayParameter* in,
                   NumberArray* out) override {
-    for (int i = 0; i < in->value_size(); ++i)
-    {
+    for (int i = 0; i < in->value_size(); ++i) {
       out->add_value(in->value(i)*in->parameter());
     }
     return Status::OK;
   }
-
 };
 
 void RunServer() {

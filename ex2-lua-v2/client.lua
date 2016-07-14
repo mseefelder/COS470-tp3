@@ -41,7 +41,6 @@ function writer()
 			print("Received error: ", err)
 	    elseif response == tostring(0x2) then
 	    	-- 0x2 == GRANT
-	    	--print("Aw yis")
 			-- critical session start
 				local file = io.open("critical.txt", "a")
 				file:write(name .. " is writing " .. i .. "\n")
