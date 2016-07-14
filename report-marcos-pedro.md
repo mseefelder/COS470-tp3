@@ -122,11 +122,11 @@ Onde o número 4 é substituído pelo número de processos e o *array* `arrK` co
 
 Apresentamos a seguir os gráficos com os tempos dos testes.
 
-![](https://i.imgur.com/02JGrt1.png){ width=50% }\ ![](https://i.imgur.com/42way9x.png){ width=50% }
+![](images/grafico_comparativo.png){ width=75% }\
 
-*Resultados dos tempos para entrade de processos em "bulk arrival" (esquerda) e "sequential arrival" (direita), média de 10 execuções por número de threads*
+*Resultados dos tempos para entrade de processos em "bulk arrival" "sequential arrival", média de 10 execuções por número de threads*
 
-Pode-se perceber que há pouca variação no tempo médio de execução, mesmo com o aumento do número de processos. O que provavelmente ocorre é que a escrita no arquivo é muito veloz e como o tempo de espera entre escritas é algo entre [0 e 1] (e está fora da região crítica), podemos considerar que a média será algo por volta de 0.5 segundos. Como são 100 escritas, pra um processo faz sentido o tempo ser por volta de 50 segundos. O que acontece quando entram mais processos é que haverá sempre um esperando a mensagem de GRANT, pronto para escrever, então no espaço de tempo que o primeiro espera pra fazer o próximo request (em média 0.5 segundos), todos ou a maioria conseguem permissão e escrevem também.
+Pode-se perceber que há pouca variação no tempo médio de execução, no caso do *bulk arrival*. O que provavelmente ocorre é que a escrita no arquivo é muito veloz e como o tempo de espera entre escritas é algo entre [0 e 1] (e está fora da região crítica), podemos considerar que a média será algo por volta de 0.5 segundos. Como são 100 escritas, pra um processo faz sentido o tempo ser por volta de 50 segundos. O que acontece quando entram mais processos é que haverá sempre um esperando a mensagem de GRANT, pronto para escrever, então no espaço de tempo que o primeiro espera pra fazer o próximo request (em média 0.5 segundos), todos ou a maioria conseguem permissão e escrevem também. Já no caso de *sequential arrival* o tempo de execução aumenta como esperado.
 
 Para a checagem da escrita das *threads*, foi criado um *script* em Javascript para fazer a leitura do arquivo de texto e realizar a verificação. O *script*, verifica o número de palavras que tem em cada linha, caso exista algum erro, o programa retorna a linha do erro. Além disso, faz uma verificação se houve exatamente 100 escritas para cada *thread*, caso não tenha, o *script* retorna quais as *threads* que não escreveram.
 
